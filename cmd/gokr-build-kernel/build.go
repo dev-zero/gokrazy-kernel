@@ -16,10 +16,7 @@ import (
 )
 
 // see https://www.kernel.org/releases.json
-var latest = "https://cdn.kernel.org/pub/linux/kernel/v6.x/linux-6.8.7.tar.xz"
-
-//go:embed config.addendum.txt
-var configAddendum []byte
+var latest = "https://github.com/raspberrypi/linux/archive/b5dbe58ae4140a1ef7b86e4757e872c209b9f9ab.tar.gz"
 
 func downloadKernel() error {
 	out, err := os.Create(filepath.Base(latest))
@@ -68,38 +65,11 @@ func applyPatches(srcdir string) error {
 }
 
 func compile() error {
-	defconfig := exec.Command("make", "ARCH=arm64", "defconfig")
+	defconfig := exec.Command("make", "ARCH=arm64", "gooniebox_defconfig")
 	defconfig.Stdout = os.Stdout
 	defconfig.Stderr = os.Stderr
 	if err := defconfig.Run(); err != nil {
 		return fmt.Errorf("make defconfig: %v", err)
-	}
-
-	// Change answers from mod to no if possible
-	mod2noconfig := exec.Command("make", "ARCH=arm64", "mod2noconfig")
-	mod2noconfig.Stdout = os.Stdout
-	mod2noconfig.Stderr = os.Stderr
-	if err := mod2noconfig.Run(); err != nil {
-		return fmt.Errorf("make olddefconfig: %v", err)
-	}
-
-	f, err := os.OpenFile(".config", os.O_APPEND|os.O_WRONLY, 0644)
-	if err != nil {
-		return err
-	}
-	defer f.Close()
-	if _, err := f.Write(configAddendum); err != nil {
-		return err
-	}
-	if err := f.Close(); err != nil {
-		return err
-	}
-
-	olddefconfig := exec.Command("make", "ARCH=arm64", "olddefconfig")
-	olddefconfig.Stdout = os.Stdout
-	olddefconfig.Stderr = os.Stderr
-	if err := olddefconfig.Run(); err != nil {
-		return fmt.Errorf("make olddefconfig: %v", err)
 	}
 
 	env := append(os.Environ(),
@@ -169,7 +139,12 @@ func main() {
 		log.Fatalf("untar: %v", err)
 	}
 
-	srcdir := strings.TrimSuffix(filepath.Base(latest), ".tar.xz")
+	srcdir := "linux-" + strings.TrimSuffix(filepath.Base(latest), ".tar.gz")
+
+	log.Printf("copying defconfig")
+	if err := copyFile(srcdir+"/arch/arm64/configs/gooniebox_defconfig", "defconfig"); err != nil {
+		log.Fatal(err)
+	}
 
 	log.Printf("applying patches")
 	if err := applyPatches(srcdir); err != nil {
@@ -189,15 +164,15 @@ func main() {
 		log.Fatal(err)
 	}
 
-	if err := copyFile("/tmp/buildresult/bcm2710-rpi-3-b.dtb", "arch/arm64/boot/dts/broadcom/bcm2837-rpi-3-b.dtb"); err != nil {
+	if err := copyFile("/tmp/buildresult/bcm2710-rpi-3-b.dtb", "arch/arm64/boot/dts/broadcom/bcm2710-rpi-3-b.dtb"); err != nil {
 		log.Fatal(err)
 	}
 
-	if err := copyFile("/tmp/buildresult/bcm2710-rpi-3-b-plus.dtb", "arch/arm64/boot/dts/broadcom/bcm2837-rpi-3-b-plus.dtb"); err != nil {
+	if err := copyFile("/tmp/buildresult/bcm2710-rpi-3-b-plus.dtb", "arch/arm64/boot/dts/broadcom/bcm2710-rpi-3-b-plus.dtb"); err != nil {
 		log.Fatal(err)
 	}
 
-	if err := copyFile("/tmp/buildresult/bcm2710-rpi-cm3.dtb", "arch/arm64/boot/dts/broadcom/bcm2837-rpi-cm3-io3.dtb"); err != nil {
+	if err := copyFile("/tmp/buildresult/bcm2710-rpi-cm3.dtb", "arch/arm64/boot/dts/broadcom/bcm2710-rpi-cm3.dtb"); err != nil {
 		log.Fatal(err)
 	}
 
@@ -205,7 +180,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	if err := copyFile("/tmp/buildresult/bcm2710-rpi-zero-2-w.dtb", "arch/arm64/boot/dts/broadcom/bcm2837-rpi-zero-2-w.dtb"); err != nil {
+	if err := copyFile("/tmp/buildresult/bcm2710-rpi-zero-2-w.dtb", "arch/arm64/boot/dts/broadcom/bcm2710-rpi-zero-2-w.dtb"); err != nil {
 		log.Fatal(err)
 	}
 

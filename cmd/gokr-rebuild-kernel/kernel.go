@@ -20,6 +20,9 @@ FROM debian:buster
 RUN apt-get update && apt-get install -y crossbuild-essential-arm64 bc libssl-dev bison flex kmod
 
 COPY gokr-build-kernel /usr/bin/gokr-build-kernel
+
+COPY {{ .Defconfig }} /usr/src/{{ .Defconfig }}
+
 {{- range $idx, $path := .Patches }}
 COPY {{ $path }} /usr/src/{{ $path }}
 {{- end }}
@@ -42,8 +45,6 @@ var dockerFileTmpl = template.Must(template.New("dockerfile").
 
 var patchFiles = []string{
 	"0001-Revert-add-index-to-the-ethernet-alias.patch",
-	// spi
-	"0201-enable-spidev.patch",
 	// logo
 	"0001-gokrazy-logo.patch",
 }
@@ -156,6 +157,12 @@ func main() {
 		patchPaths = append(patchPaths, path)
 	}
 
+	path, err := find("defconfig")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defconfig := path
+
 	kernelPath, err := find("vmlinuz")
 	if err != nil {
 		log.Fatal(err)
@@ -193,6 +200,10 @@ func main() {
 		}
 	}
 
+	if err := copyFile(filepath.Join(tmp, filepath.Base(defconfig)), defconfig); err != nil {
+		log.Fatal(err)
+	}
+
 	u, err := user.Current()
 	if err != nil {
 		log.Fatal(err)
@@ -207,11 +218,13 @@ func main() {
 		Gid       string
 		BuildPath string
 		Patches   []string
+		Defconfig string
 	}{
 		Uid:       u.Uid,
 		Gid:       u.Gid,
 		BuildPath: buildPath,
 		Patches:   patchFiles,
+		Defconfig: defconfig,
 	}); err != nil {
 		log.Fatal(err)
 	}
